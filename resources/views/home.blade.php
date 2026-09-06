@@ -1,6 +1,6 @@
 @extends('layouts.site')
 
-@section('title', 'Browse jobs')
+@section('title', 'مشاهده آگهی‌ها')
 
 @section('content')
     <livewire:job-board />

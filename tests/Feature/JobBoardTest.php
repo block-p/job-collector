@@ -83,4 +83,35 @@ class JobBoardTest extends TestCase
             ->assertSee('Backend Developer')
             ->assertDontSee('Frontend Developer');
     }
+
+    public function test_pagination_renders_properly_without_dumping_keys(): void
+    {
+        $platform = PlatformPosting::create([
+            'title' => 'JobVision',
+            'url' => 'https://jobvision.ir',
+        ]);
+
+        for ($i = 1; $i <= 15; $i++) {
+            JobPosting::create([
+                'platform_id' => $platform->id,
+                'title' => sprintf('Job Position %02d', $i),
+                'company' => 'Test Company',
+                'location' => 'Tehran',
+                'contract' => 'Full-time',
+                'url' => "https://example.com/jobs/{$i}",
+                'skills' => ['PHP'],
+                'created_at' => now()->subMinutes(20 - $i),
+            ]);
+        }
+
+        Livewire::test(JobBoard::class)
+            ->assertDontSee('activepage')
+            ->assertSeeHtml('aria-current="page"')
+            ->assertSeeHtml('wire:click="nextPage(\'page\')"')
+            ->assertSee('Job Position 15')
+            ->call('nextPage')
+            ->assertSet('paginators.page', 2)
+            ->assertSee('Job Position 03')
+            ->assertDontSee('activepage');
+    }
 }

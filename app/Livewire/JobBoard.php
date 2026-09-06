@@ -78,7 +78,7 @@ class JobBoard extends Component
 
         return view('livewire.job-board', [
             'jobs' => $query->paginate(12),
-            'platforms' => PlatformPosting::orderBy('title')->get(['id', 'title']),
+            'platforms' => PlatformPosting::withCount('jobPostings')->orderBy('title')->get(),
             'contracts' => JobPosting::query()
                 ->whereNotNull('contract')->where('contract', '!=', '')
                 ->distinct()->orderBy('contract')->pluck('contract'),
@@ -86,6 +86,7 @@ class JobBoard extends Component
                 ->whereNotNull('location')->where('location', '!=', '')
                 ->distinct()->orderBy('location')->pluck('location'),
             'total' => JobPosting::count(),
+            'latest' => JobPosting::orderByDesc('created_at')->value('created_at'),
         ]);
     }
 }
