@@ -1,58 +1,127 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Job Collector
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A Laravel + Filament app for collecting job postings from multiple job boards into one searchable database.
 
-## About Laravel
+Define a source once (API endpoint or server-rendered HTML page, request config, and a response mapping), then run crawls from the admin panel — in the background via the queue — and browse the normalized results.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Features
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- **Sources (Platforms)** — configure each job board with method (`GET`/`POST`), base URL + endpoint, headers, query params, body template, pagination rules, and a field mapping.
+- **One-click background crawls** — the `Run` action on a source opens a form pre-filled from its saved params, accepts runtime overrides (filters, `max_pages`), and dispatches `FetchJobsFromApi` to the queue.
+- **JSON API + HTML crawling** — `JobCrawlerService` handles JSON APIs (via a configurable `list_path` + field map) and server-rendered HTML lists (Jobinja-style `c-jobListView` markup).
+- **Deduplication** — results are bulk-upserted on the unique key (`url`, `platform_id`); runs also stop early when a page yields no new URLs.
+- **Job browser** — search/filter job postings by platform, contract, company, and location; bulk delete included.
+- **Live ops views** — `Running Tasks` (reads the `jobs` table, polls every 2s, cancel single/all) and `Task Logs` (per-run `crawl_logs` with filters used, jobs/pages counts, duration, error; polls every 3s).
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Tech stack
 
-## Learning Laravel
+- PHP `^8.3`, Laravel `^13`, Filament `^3.2`
+- SQLite by default (`DB_CONNECTION=sqlite`), database queue / cache / session
+- Vite + Tailwind (Filament assets)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Requirements
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- PHP `^8.3` with the usual Laravel extensions (`sqlite3`, `dom`, `mbstring`)
+- Composer
+- Node + npm (only for rebuilding frontend assets)
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Quickstart
 
 ```bash
-composer require laravel/boost --dev
+composer setup
+# equivalent to:
+#   composer install
+#   cp .env.example .env (if missing)
+#   php artisan key:generate
+#   php artisan migrate --force
+#   npm install && npm run build
 
-php artisan boost:install
+php artisan serve          # app at http://localhost:8000
+php artisan queue:work     # required: executes the background crawls
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Then open `http://localhost:8000/admin`, create an admin user if needed (`php artisan make:filament-user`), and add your first source.
 
-## Contributing
+> Crawls are queued (`QUEUE_CONNECTION=database`), so `php artisan queue:work` must be running or `Run` jobs will just sit in `Running Tasks` as `Queued`.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Usage
 
-## Code of Conduct
+### 1. Add a source (`/admin` → Sources)
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+| Field | What it is |
+|---|---|
+| `title` | Display name, e.g. `E-Estekhdam` |
+| `method` | `GET` or `POST` |
+| `url` | Site base URL, used to resolve relative job links |
+| `endpoint` | API path or page path, e.g. `/search-api/search` |
+| `headers` / `query_params` / `body_template` | Key-value defaults sent with every request |
+| `pagination` | `{ type: query\|body, page_key, start_page, max_pages }` |
+| `response_mapping` | `{ list_path, fields: { title, company, location, salary, url, contract, skills } }` |
+| `delay_ms` | Pause between pages (default `1000`) |
 
-## Security Vulnerabilities
+`list_path` uses Laravel `data_get` dot notation (default `data`). Field values are also `data_get` paths into each item, e.g. `contract.0` or `skills.*.title`.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### 2. Run a crawl
+
+On a source row → **Run**. The dialog is generated from that source's saved `query_params` / `body_template`, so per-run overrides (keyword, location, tags, `max_pages`) don't require editing the source. Dispatching shows a `Crawler started in background` notification.
+
+### 3. Browse results (`/admin` → Job Postings)
+
+Searchable/sortable table with platform + contract filters and a company search. Skills render as badges; `Delete All Records` / bulk delete are available for resets.
+
+### 4. Monitor (`/admin` → Running Tasks / Task Logs)
+
+- **Running Tasks**: queued vs. running jobs with their effective filters, cancellable individually or all at once (`queue:clear`).
+- **Task Logs**: one row per crawl attempt — source, resolved filters, `success`/`failed`/`running`, jobs saved, pages visited, duration, and error message.
+
+## How the crawler works
+
+`App\Services\JobCrawlerService::crawl(PlatformPosting $source, array $options = [])`:
+
+1. Merges saved `body_template`/`query_params` with per-run `$options['body']` / `$options['query_params']` (empty values ignored); JSON-array strings are decoded to real arrays.
+2. Creates a `crawl_logs` row in `running` status capturing the effective filters.
+3. Loops `start_page..max_pages`, injecting the page into the query string or body per `pagination.type`, with HTTP retry (3 ×, 25s timeout).
+4. Parses the response as JSON (`list_path`) or HTML (DOM/XPath over the job-list markup).
+5. Normalizes each item through the field map: fixes relative URLs against `url`, flattens array `contract` values, normalizes `skills` (arrays of strings/objects, JSON strings, or comma-separated strings) into clean string lists, and JSON-encodes any leftover arrays.
+6. Breaks early on empty pages or pages with zero unseen URLs; otherwise bulk-upserts by (`url`, `platform_id`).
+7. Updates the source's `last_status` / `last_error` / `last_crawled_at` and finalizes the crawl log with counts + `duration_ms`. Failures are recorded on both and logged.
+
+## Project structure
+
+```
+app/
+  Filament/Resources/
+    PlatformPostingResource.php   # source CRUD + Run action
+    JobPostingResource.php        # job browser + filters
+    RunningTaskResource.php       # live view over `jobs` table
+    TaskLogResource.php           # history view over `crawl_logs`
+  Jobs/FetchJobsFromApi.php       # queued wrapper (1h timeout, 1 try)
+  Services/JobCrawlerService.php  # crawl engine (JSON + HTML)
+  Models/
+    PlatformPosting.php  JobPosting.php  CrawlLog.php  JobQueue.php
+database/migrations/
+  *_create_platform_postings_table.php
+  *_create_job_postings_table.php
+  *_add_http_field_to_platform_postings.php
+  *_create_crawl_logs_table.php
+  *_add_skills_to_job_postings_table.php
+```
+
+## Useful commands
+
+```bash
+php artisan migrate          # apply migrations (SQLite file in database/)
+php artisan queue:work       # process crawls
+php artisan queue:clear      # drop all queued crawls
+composer test                # config:clear + artisan test
+```
+
+## Configuration notes
+
+- Defaults live in `.env.example`: SQLite database, `database` queue/cache/session, `log` mailer/broadcaster.
+- Never commit `.env` or `database/*.sqlite` — both are git-ignored (`database/.gitignore` covers `*.sqlite*`).
+- `composer.json` scripts: `setup` (install + key + migrate + build), `dev` (`artisan dev`), `test`.
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+MIT — same as the Laravel skeleton this project is built on.
