@@ -1,0 +1,41 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_URL: http://localhost:8000
+      DB_DATABASE: /data/database.sqlite
+      LOG_CHANNEL: stderr
+      RUN_MIGRATIONS: 1
+    volumes:
+      - sqlite-data:/data
+    restart: unless-stopped
+
+  # Background crawls are queued (QUEUE_CONNECTION=database),
+  # so this worker must be running for "Run" to do anything.
+  queue:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_DATABASE: /data/database.sqlite
+      LOG_CHANNEL: stderr
+    volumes:
+      - sqlite-data:/data
+    command:
+      - sh
+      - -c
+      - |
+        sleep 8
+        exec php artisan queue:work --sleep=3 --tries=1 --timeout=3600
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  sqlite-data:
