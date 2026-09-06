@@ -4,6 +4,16 @@ A modern Laravel + Livewire + Filament application for aggregating, crawling, an
 
 ---
 
+## Screenshots
+
+### Public Job Board (Dark Mode)
+![Public Job Board](docs/images/job-board-dark.png)
+
+### Filament Admin Panel (Platform Sources)
+![Filament Admin - Sources](docs/images/admin-sources-dark.png)
+
+---
+
 ## Features
 
 ### 🌟 Public Job Board (`/`)
@@ -11,8 +21,8 @@ A modern Laravel + Livewire + Filament application for aggregating, crawling, an
 - **Dark / Light Mode** — Instant theme toggle with localStorage persistence and system theme detection (`prefers-color-scheme`).
 - **Livewire Real-Time Search & Filters** — Debounced instant search across job titles, company names, and skills.
 - **Facet Filtering & Sorting** — Filter by platform/source, employment contract type, location, and sort by newest/oldest.
-- **shadcn-Inspired Blade Components (`<x-ui.*>`)** — Reusable, accessible UI components (buttons, badges, cards, inputs, selects, pagination, and skeleton loading states).
-- **Smooth Pagination** — Custom Livewire pagination with intelligent URL query sync.
+- **Smooth Pagination** — Fast Livewire pagination with URL query synchronization.
+- **Skeleton Loaders** — Visual loading state feedback during filter updates.
 
 ### ⚙️ Crawler Engine & Background Queue
 - **Flexible Source Configuration** — Configure sources with HTTP method (`GET`/`POST`), base URL, headers, query parameters, body payload templates, and pagination rules.
@@ -33,7 +43,7 @@ A modern Laravel + Livewire + Filament application for aggregating, crawling, an
 
 - **Backend:** PHP 8.3+, Laravel 13, Livewire 3
 - **Admin Panel:** Filament 3.2
-- **Frontend & Styling:** Tailwind CSS v4, Blade Components, Vazirmatn Font
+- **Frontend & Styling:** Tailwind CSS v4, Vazirmatn Font
 - **Database:** SQLite (default) / MySQL / PostgreSQL
 - **Queue:** Database queue worker (asynchronous background crawls)
 - **Containerization:** Docker & Docker Compose
@@ -124,22 +134,6 @@ The core crawl engine is handled by `App\Services\JobCrawlerService::crawl(Platf
 | **E-Estekhdam** | JSON API | Crawls via search API with JSON body payloads and pagination query params |
 | **JobVision** | JSON API | Queries JobVision candidate API with customizable category and location filters |
 | **Jobinja** | HTML Scraping | Parses server-rendered HTML job list cards and extracts attributes |
-
----
-
-## UI Components (`resources/views/components/ui/`)
-
-The public interface utilizes shadcn-inspired Blade components:
-
-| Component | Tag | Description |
-|---|---|---|
-| Card | `<x-ui.card>`, `<x-ui.card-header>`, etc. | Container card with border and background tokens |
-| Button | `<x-ui.button variant="..." size="...">` | Buttons and anchor buttons with variants (`default`, `outline`, `ghost`, etc.) |
-| Badge | `<x-ui.badge variant="...">` | Skill and category tags (`default`, `secondary`, `outline`) |
-| Input | `<x-ui.input type="..." />` | Form inputs with focus rings |
-| Select | `<x-ui.select>` | Styled dropdown selector |
-| Pagination | `<x-ui.pagination :paginator="$jobs" />` | Accessible Livewire pagination with RTL chevron orientation |
-| Skeleton | `<x-ui.skeleton class="..." />` | Loading placeholder skeletons during Livewire transitions |
 
 ---
 
